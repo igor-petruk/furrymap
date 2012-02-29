@@ -85,13 +85,34 @@ class Awesome extends Entity{
   val field2 = 0;
 }
 
+case class Elem(i:Boolean){
+  println("Elem")
+  def !&(that:Elem)={
+    println("and")
+    BinaryOp(true)
+  }
+}
+case class BinaryOp(b:Boolean){
+  println("binaryop "+b)
+}
+
 object App 
 {
+  def code(b: BinaryOp){
+
+  }
+
+  implicit def b2e(b:Boolean)=Elem(b)
+  implicit def b2b(b:Boolean)=BinaryOp(b)
+
   implicit def i2c(i:Int):Operation = new Operation(i)
 
     def main(args: Array[String]):Unit={
+       code(true !& false)
         val data = new Data(null)
         import data._
-       select[Awesome] where {x=>x.field1 !> x.field2}
+       
+      val k = select[Awesome] where {x=>x.field1 !> x.field2}
+
     }
 }
