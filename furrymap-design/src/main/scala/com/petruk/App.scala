@@ -108,6 +108,10 @@ trait IterableSelector[B] extends Selector with Iterable[B]{
     this
   }
 
+  def async(f: Iterable[K]=>Any){
+    f(null)
+  }
+
   def iterator:Iterator[K] = {
     println("Making iterator")
     List[K]().iterator
@@ -157,6 +161,9 @@ object App
         import data._
        
       val k = select[Awesome].only(_.field1).where(x=>x.field1 !> 0).map(2*_.field1)
+      select[Awesome].only(_.field1).where(x=>x.field1 !> 0).async{ result=>
+        println(result.head.field1)
+      }
 
       transaction(SomeOther, ForceNew){
         transaction(){
