@@ -102,14 +102,14 @@ trait IterableSelector[B] extends Selector with Iterable[B]{
 
   def only(queries: (K=>Any)*)(implicit m: Manifest[K]):this.type={
     println(m.erasure)
-    for (q<-queries){
+    /*for (q<-queries){
       q(null.asInstanceOf[K])
-    }
+    }*/
     this
   }
 
   def async(f: Iterable[K]=>Any){
-    f(null)
+    //f(null)
   }
 
   def iterator:Iterator[K] = {
@@ -153,7 +153,13 @@ object App
 
   implicit def i2c(i:Int):Operation = new Operation(i)
 
-  implicit def sel2it[T](i: Selector{type K=T}):Iterable[T]=null
+  implicit def sel2it[T](i: Selector{type K=T}):Iterable[T]=new Iterable[T]{
+    def iterator = new Iterator[T]{
+      def hasNext = false
+
+      def next():T = null.asInstanceOf[T]
+    }
+  }
 
     def main(args: Array[String]):Unit={
        code(true !& false)
@@ -179,16 +185,11 @@ object App
       val collection = db.getCollection("collection1");
       collection.drop();
 
-      for (i<-0 to 1000000){
+      for (i<-0 to 10000){
         val obj = new BasicDBObject();
         obj.put("test", "some");
         collection.insert(obj)
       }
 
-
-      /*for(a<-asScalaIterator(collection.find())){
-        println(a)
-      } */
-      
     }
 }
