@@ -6,4 +6,5 @@
 *.iml
 *.iws
 target
-
+*/.idea
+.idea
