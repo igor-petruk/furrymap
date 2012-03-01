@@ -6,8 +6,8 @@
  * To change this template use File | Settings | File Templates.
  */
 
-class App {
-  def main(args:Array[Int]){
+object App {
+  def main(args:Array[String]){
     println("Hi!")
   }
 }
