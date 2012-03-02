@@ -51,17 +51,21 @@ object persistence {
        */
       val fields:immutable.Map[String, Field] = provideFields;
 
-      private def provideFields=
+      private def provideFields={
+        def makeTuple(f:Field) = (f.getName, f)
+        def makeAccesible(item:(String, Field)) = {
+          item._2.setAccessible(true) // Access to private, final...
+          item
+        }
+
         (klass.getDeclaredFields.
             filterNot(shouldBeAdded).
-            map({x=>(x.getName, x)})
+            map(makeTuple)
           ++
-            extraFields
-        ).map(item=>{
-            item._2.setAccessible(true) // Access to private, final...
-            item
-        }).
-        toMap[String,Field]
+            extraFields).
+          map(makeAccesible).
+            toMap[String,Field]
+      }
 
       /**
        * Filter out field if it should not be persisted
