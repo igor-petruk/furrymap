@@ -24,18 +24,33 @@ import java.lang.reflect.{Modifier, Field}
 object persistence {
   object EntitiesMetaInfo{
     class MetaInfo(klass: Class[_]){
-      
+
+      /**
+       * This is a list of mappings of fields, that
+       * have different name in class, then in MongoDB collection.
+       * First item is name in collection, second one is name in class
+       * @return mappings
+       */
       def specialMapping=immutable.Map[String, String](
         "_id"->"objectId"
       )
-      
+
+      /**
+       * Calculate fields that are mapped with special mappings
+       * @return
+       */
       def extraFields:immutable.Map[String,Field]=
         specialMapping.
           filter{item=>klass.getDeclaredField(item._2)!=null}.
           map{item=>(item._1, klass.getDeclaredField(item._2))}
 
-    
+
+      /**
+       * Precalcuated mapping of fields in collections to fields
+       * in class
+       */
       val fields:immutable.Map[String, Field] = provideFields;
+
       private def provideFields=
         (klass.getDeclaredFields.
             filterNot(shouldBeAdded).
@@ -43,24 +58,43 @@ object persistence {
           ++
             extraFields
         ).map(item=>{
-            item._2.setAccessible(true)
+            item._2.setAccessible(true) // Access to private, final...
             item
         }).
         toMap[String,Field]
-      
+
+      /**
+       * Filter out field if it should not be persisted
+       * or should be processed via extraFields
+       * @param field
+       * @return
+       */
       private def shouldBeAdded(field:Field)={
         (specialMapping.values.exists(field.getName==_))||
         (field.getName.contains("metaInfo"))||
         (field.getName.contains("furrymapObjectInfo"))
       }
     }
+
+    /**
+     * Info on entity (mappings, etc).
+     */
     @transient
     private val metainfo = new HashMap[Class[_], MetaInfo] with SynchronizedMap[Class[_],MetaInfo]
-    
+
+    /**
+     * Accessor and lazy populator of metainfo
+     * @param klass class to query
+     * @tparam T
+     * @return metainfo
+     */
     def getMetaInfo[T](klass: Class[T]) = metainfo.getOrElseUpdate(klass,new MetaInfo(klass))
   }
   
   class DBObjectInfo {
+    /**
+     * Tells if object is partially populated via partial query
+     */
     var partialObject = false;
   }
 
@@ -117,11 +151,17 @@ object persistence {
 
     def keySet() = metaInfo.fields.keySet
   }
-  
+
+  /**
+   * Trait that gives access to object id
+   */
   trait WithObjectId{
     var objectId: ObjectId = new ObjectId()
   }
-  
+
+  /**
+   * All Furrymap entites superclass
+   */
   trait Entity extends WithObjectId with DBObjectImpl
 
 }
