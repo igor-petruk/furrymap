@@ -1,12 +1,4 @@
 
-/**
- * Created by IntelliJ IDEA.
- * User: boui
- * Date: 3/1/12
- * Time: 8:23 PM
- * To change this template use File | Settings | File Templates.
- */
-
 import collection.mutable.Stack
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
