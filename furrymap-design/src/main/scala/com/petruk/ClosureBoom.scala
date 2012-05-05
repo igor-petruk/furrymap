@@ -27,15 +27,12 @@ class MyInterceptor extends MethodInterceptor{
 trait IterableSelector[B] extends Selector with Iterable[B]{
   type K=B
   def where(expression: K=>MegaBoolean)(implicit m: Manifest[K]):this.type = {
-    println(m.erasure)
-    if (m.erasure==classOf[Awesome]){
-      val enhancer = new Enhancer();
-      enhancer.setSuperclass(classOf[Awesome]);
-      enhancer.setCallback(new MyInterceptor)
-      val proxy = enhancer.create();
-      val result = expression(proxy.asInstanceOf[K])
-      println(result)
-    }
+    val enhancer = new Enhancer();
+    enhancer.setSuperclass(m.erasure);
+    enhancer.setCallback(new MyInterceptor)
+    val proxy = enhancer.create();
+    val result:MegaBoolean = expression(proxy.asInstanceOf[K])
+    println(result)
     this
   }
 
@@ -62,6 +59,7 @@ class Awesome extends EntityT{
 
 abstract class MegaExpression
 
+
 abstract class MegaBoolean extends MegaExpression{
   def &&(other:MegaBoolean):MegaBoolean = AndMegaBoolean(this, other)
 }
@@ -70,6 +68,7 @@ case class FieldMegaBoolean(field:FieldInfo) extends MegaBoolean
 case class AndMegaBoolean(left:MegaBoolean, right:MegaBoolean)  extends MegaBoolean
 case class GreaterNumericsMegaBoolean(left:MegaNumeric, right:MegaNumeric)  extends MegaBoolean
 
+
 abstract class MegaNumeric extends MegaExpression{
   def !>(other:MegaNumeric):MegaBoolean = GreaterNumericsMegaBoolean(this, other)
 }
@@ -77,28 +76,26 @@ case class ExactMegaNumeric(value:Int) extends MegaNumeric
 case class FieldMegaNumeric(field:FieldInfo) extends MegaNumeric
 
 object ops{
-  implicit def i2mn(i: =>Int):MegaNumeric={
+
+  implicit def i2mn[K](i: =>K)(implicit m:Manifest[K]):MegaNumeric={
     try{
-      val value = i
+      val value:Int = i.asInstanceOf[Int]
       return ExactMegaNumeric(value)
     }catch{
       case e:FieldNotificationException=>return FieldMegaNumeric(e.info)
     }
   }
 
-  def examine(i: => Int){
-    val m:MegaNumeric = i
-    println(m)
-  }
 }
 
 object ClosureBoom {
+    val data = new Data(null)
+    import data._
+    import ops._
+
      def main(s:Array[String]){
-        val data = new Data(null)
-        import data._
-        import ops._
         
-        select[Awesome].where(x=>(x.field1!>x.field2) && (x.field1!>19))
+        select[Awesome] where (x=>(x.field1!>x.field2) && (x.field1!>19))
         //select[Awesome].where(x=>(x.field1>x.field2)&&(x.field2>2))
      }
 }
