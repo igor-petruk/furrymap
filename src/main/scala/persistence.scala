@@ -11,26 +11,55 @@ import com.mongodb.{DB, Mongo}
  */
 
 trait QueryImplicits{
-  implicit def conversionInt(i: =>Int):IntFNumeric=
+  private def complain = throw new IllegalStateException("Usage of operation with numbers in first position is not allowed")
+  private def complainToField = throw new IllegalStateException("Usage of operation with field in second position is not allowed")
+
+  implicit def conversionInt1(i: =>Int):IntFieldFNumeric=
     try{
-      IntExactFNumeric(i)
+      val k:Int = i
+      complain
     }catch{
       case e:
         FieldNotificationException=>return IntFieldFNumeric(e.info)
     }
 
-  implicit def conversionDouble(i: =>Double):DoubleFNumeric=
+  implicit def conversionInt2(i: =>Int):IntExactFNumeric=
     try{
-      DoubleExactFNumeric(i)
+      IntExactFNumeric(i)
+    }catch{
+      case e:
+        FieldNotificationException=> complainToField
+    }
+
+
+  implicit def conversionDouble1(i: =>Double):DoubleFieldFNumeric=
+    try{
+      val k = i
+      complain
     }catch{
       case e:FieldNotificationException=>return DoubleFieldFNumeric(e.info)
     }
 
-  implicit def conversion(i: =>String):FString=
+  implicit def conversionDouble2(i: =>Double):DoubleExactFNumeric=
+    try{
+      DoubleExactFNumeric(i)
+    }catch{
+      case e:FieldNotificationException=>complainToField
+    }
+
+  implicit def conversion1(i: =>String):FieldFString=
+    try{
+      val k = i
+      complain
+    }catch{
+      case e:FieldNotificationException=>return FieldFString(e.info)
+    }
+
+  implicit def conversion2(i: =>String):ExactFString=
     try{
       ExactFString(i)
     }catch{
-      case e:FieldNotificationException=>return FieldFString(e.info)
+      case e:FieldNotificationException=>complainToField
     }
 }
 

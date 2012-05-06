@@ -2,6 +2,9 @@ package com.github.igor_petruk.furrymap.query
 
 import java.lang.reflect.Method
 import net.sf.cglib.proxy.{Enhancer, MethodProxy, MethodInterceptor}
+import com.github.igor_petruk.furrymap.persistence.Entity
+import com.mongodb.{BasicDBObject, Mongo, DBObject}
+import java.util.ArrayList
 
 /**
  * User: boui
@@ -9,39 +12,91 @@ import net.sf.cglib.proxy.{Enhancer, MethodProxy, MethodInterceptor}
  * Time: 4:09 PM
  */
 
+object ToJava{
+   def toJava[T](seq:Iterable[T]):ArrayList[T]={
+    val l = new ArrayList[T]() 
+    for(item<-seq){
+      l.add(item)
+    }
+    l
+   }
+}
+
+import ToJava._
+
 case class FieldInfo(fieldName:String, fieldType:Class[_])
 case class FieldNotificationException(info:FieldInfo) extends RuntimeException
 
-abstract class OperationType
+abstract class OperationType{
+  def abbreviation:String
+}
 
-object Equals extends OperationType
+object Equals extends OperationType{
+  def abbreviation = null
+}
 
 abstract class NumericOperationType extends OperationType
-object Greater extends NumericOperationType
-object Less extends NumericOperationType
+object Greater extends NumericOperationType{
+  def abbreviation = "$gt"
+}
+object Less extends NumericOperationType{
+  def abbreviation = "$lt"
+}
 
 abstract class StringOperationType extends OperationType
-object Like extends StringOperationType
+object Like extends StringOperationType{
+  def abbreviation = "$like"
+}
 
 abstract class BooleanOperationType extends OperationType
-object And extends BooleanOperationType
-object Or extends BooleanOperationType
+object And extends BooleanOperationType{
+  def abbreviation = "$and"
+}
+object Or extends BooleanOperationType{
+  def abbreviation = "$or"
+}
 
 trait SetOperation[T] {
   def in(set:Iterable[T]):FBoolean
 }
 
-case class ExactFBoolean(value:Boolean) extends FBoolean
-case class FieldFBoolean(field:FieldInfo) extends FBoolean
-case class BooleanBinaryOperation(left:FBoolean,  right:FBoolean, op:OperationType) extends FBoolean
-case class NumericBinaryOperation(left:FNumeric,  right:FNumeric, op:OperationType) extends FBoolean
-case class IntSetOperation(left:IntFNumeric,  right:Iterable[Int]) extends FBoolean
-case class DoubleSetOperation(left:DoubleFNumeric,  right:Iterable[Double]) extends FBoolean
-case class StringBinaryOperation(left:FString,  right:FString, op:OperationType) extends FBoolean
-case class StringSetOperation(left:FString,  right:Iterable[String]) extends FBoolean
+case class FieldFBoolean(field:FieldInfo) extends FBoolean{
+  def eval = new BasicDBObject(field.fieldName, true)
+}
+case class BooleanBinaryOperation(left:FBoolean,  right:FBoolean, op:OperationType) extends FBoolean{
+  def eval = op match {
+    case And|Or=> new BasicDBObject(op.abbreviation, toJava(List(left.eval, right.eval)))
+  }
+}
+case class NumericBinaryOperation(left:FieldFNumeric,  right:ExactFNumeric, op:OperationType) extends FBoolean{
+  def eval = op match {
+    case Greater|Less => new BasicDBObject(left.getName, new BasicDBObject(op.abbreviation, right.getValue))
+  }
+}
+case class IntSetOperation(left:IntFieldFNumeric,  right:Iterable[Int]) extends FBoolean{
+  def eval = new BasicDBObject(left.getName, new BasicDBObject("$in", toJava(right)))
+}
+case class DoubleSetOperation(left:DoubleFieldFNumeric,  right:Iterable[Double]) extends FBoolean{
+  def eval = new BasicDBObject(left.getName, new BasicDBObject("$in", toJava(right)))
+}
+case class StringBinaryOperation(left:FieldFString,  right:ExactFString, op:OperationType) extends FBoolean{
+  def eval = op match {
+    case Equals=> new BasicDBObject(left.field.fieldName, right.value)
+    case Like=> new BasicDBObject(left.field.fieldName, new BasicDBObject(op.abbreviation, right.value))
+  }
+}
+case class StringSetOperation(left:FieldFString,  right:Iterable[String]) extends FBoolean {
+  def eval = new BasicDBObject(left.field.fieldName, new BasicDBObject("$in", toJava(right)))
+}
 
 
-abstract class FExpression
+abstract class FExpression{
+  def eval:DBObject
+}
+
+trait EvalStub{
+  def eval:DBObject = null
+}
 
 abstract class FBoolean extends FExpression{
   def &&(other:FBoolean):FBoolean = BooleanBinaryOperation(this, other, And)
@@ -50,30 +105,46 @@ abstract class FBoolean extends FExpression{
 }
 
 abstract class FNumeric extends FExpression{
-  def gt(other:FNumeric):FBoolean = NumericBinaryOperation(this, other, Greater)
-  def lt(other:FNumeric):FBoolean = NumericBinaryOperation(this, other, Less)
-  def eqs(other:FNumeric):FBoolean = NumericBinaryOperation(this, other, Equals)
 }
 
-abstract class DoubleFNumeric extends FNumeric with SetOperation[Double]{
+trait ExactFNumeric extends EvalStub{
+  def getValue:AnyRef
+}
+
+trait FieldFNumeric extends EvalStub{
+  def getName:String
+  def gt(other:ExactFNumeric):FBoolean = NumericBinaryOperation(this, other, Greater)
+  def lt(other:ExactFNumeric):FBoolean = NumericBinaryOperation(this, other, Less)
+  def eqs(other:ExactFNumeric):FBoolean = NumericBinaryOperation(this, other, Equals)
+}
+
+abstract class DoubleFNumeric extends FNumeric
+case class DoubleExactFNumeric(value:Double) extends DoubleFNumeric with ExactFNumeric{
+  def getValue = value.asInstanceOf[AnyRef]
+}
+case class DoubleFieldFNumeric(field:FieldInfo) extends DoubleFNumeric with FieldFNumeric with SetOperation[Double]{
   def in(set: Iterable[Double]) = DoubleSetOperation(this, set)
+  def getName = field.fieldName
 }
-case class DoubleExactFNumeric(value:Double) extends DoubleFNumeric
-case class DoubleFieldFNumeric(field:FieldInfo) extends DoubleFNumeric
 
-abstract class IntFNumeric extends FNumeric  with SetOperation[Int]{
+abstract class IntFNumeric extends FNumeric
+
+case class IntExactFNumeric(value:Int) extends IntFNumeric with ExactFNumeric{
+  def getValue = value.asInstanceOf[AnyRef]
+}
+case class IntFieldFNumeric(field:FieldInfo) extends IntFNumeric with FieldFNumeric with SetOperation[Int]{
   def in(set: Iterable[Int]) = IntSetOperation(this, set)
+  def getName = field.fieldName
 }
-case class IntExactFNumeric(value:Int) extends IntFNumeric
-case class IntFieldFNumeric(field:FieldInfo) extends IntFNumeric
 
-abstract class FString extends FExpression with SetOperation[String]{
+abstract class FString extends FExpression
+
+case class ExactFString(value:String) extends FString with EvalStub
+case class FieldFString(field:FieldInfo) extends FString with SetOperation[String] with EvalStub{
   def in(set: Iterable[String]) = StringSetOperation(this,  set)
-  def like(other:FString):FBoolean = StringBinaryOperation(this, other, Like)
-  def eqs(other:FString):FBoolean = StringBinaryOperation(this, other, Equals)
+  def like(other:ExactFString):FBoolean = StringBinaryOperation(this, other, Like)
+  def eqs(other:ExactFString):FBoolean = StringBinaryOperation(this, other, Equals)
 }
-case class ExactFString(value:String) extends FString
-case class FieldFString(field:FieldInfo) extends FString
 
 trait Selector{
   type K
@@ -107,5 +178,54 @@ trait IterableSelector[B] extends Selector with Iterable[B]{
   def iterator:Iterator[K] = {
     println("Making iterator")
     List[K]().iterator
+  }
+}
+    /*
+class OpenedIterableSelector[T] extends IterableSelector[T]{
+  def getExpression = result
+}
+
+case class Awesome(name:String, age:Int, size:Double, alive:Boolean) extends Entity{
+  def this() = this("",0,0, false)
+}
+
+class QueryValidator{
+  def getSelectorFor[T <: Entity](implicit m: Manifest[T]) = new OpenedIterableSelector[T]
+}
+
+      */
+object Test{
+  def fixture = new {
+  //  val validator = new QueryValidator()
+  //  val selector = validator.getSelectorFor[Awesome]
+  }
+
+  def main(argv:Array[String]){
+    val mongo = new Mongo
+    val db = mongo.getDB("test")
+    val collection = db.getCollection("collection")
+    collection.drop()
+    
+    val obj = new BasicDBObject()
+    obj.put("a",false)
+    obj.put("b",false)
+    collection.insert(obj)
+    val obj1 = new BasicDBObject()
+    obj1.put("a",true)
+    obj1.put("b",true)
+    collection.insert(obj1)
+    val obj2 = new BasicDBObject()
+    obj2.put("a",false)
+    collection.insert(obj2)
+
+    val query = new BasicDBObject("b",false)
+    val cursor = collection.find(query)
+    while (cursor.hasNext){
+      val item = cursor.next()
+      println(item)
+    }
+    cursor.close()
+    
+    mongo.close
   }
 }

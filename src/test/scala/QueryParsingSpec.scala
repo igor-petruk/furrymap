@@ -61,14 +61,14 @@ class QueryParsingSpec extends Spec with GivenWhenThen {
       }
     }
 
-    it ("should parse reversed expression 12.5 lt size"){
+    it ("should parse expression 12.5 lt size"){
       given("12.5 lt size")
       val f = fixture
       import f._
-      selector.where(x=> 12.5 lt x.size)
+      selector.where(x=>  x.size lt 12.5)
       then("it should match ")
       validator.validate(selector){
-        case NumericBinaryOperation(DoubleExactFNumeric(12.5),DoubleFieldFNumeric(FieldInfo("size",_)),Less)=>
+        case NumericBinaryOperation(DoubleFieldFNumeric(FieldInfo("size",_)),DoubleExactFNumeric(12.5),Less)=>
       }
     }
 
@@ -77,7 +77,6 @@ class QueryParsingSpec extends Spec with GivenWhenThen {
       val f = fixture
       import f._
       selector.where(x=>(x.age in Set(16, 18)) && (x.name eqs "John") || (x.size gt 15.0))
-      println(selector.result)
       then("it should match ")
       validator.validate(selector){
         case
