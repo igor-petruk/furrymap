@@ -41,18 +41,18 @@ case class StringBinaryOperation(left:FString,  right:FString, op:OperationType)
 case class StringSetOperation(left:FString,  right:Iterable[String]) extends FBoolean
 
 
-abstract class MegaExpression
+abstract class FExpression
 
-abstract class FBoolean extends MegaExpression{
+abstract class FBoolean extends FExpression{
   def &&(other:FBoolean):FBoolean = BooleanBinaryOperation(this, other, And)
   def ||(other:FBoolean):FBoolean = BooleanBinaryOperation(this, other, Or)
-  def ===(other:FBoolean):FBoolean = BooleanBinaryOperation(this, other, Equals)
+  def eqs(other:FBoolean):FBoolean = BooleanBinaryOperation(this, other, Equals)
 }
 
-abstract class FNumeric extends MegaExpression{
+abstract class FNumeric extends FExpression{
   def gt(other:FNumeric):FBoolean = NumericBinaryOperation(this, other, Greater)
   def lt(other:FNumeric):FBoolean = NumericBinaryOperation(this, other, Less)
-  def ===(other:FNumeric):FBoolean = NumericBinaryOperation(this, other, Equals)
+  def eqs(other:FNumeric):FBoolean = NumericBinaryOperation(this, other, Equals)
 }
 
 abstract class DoubleFNumeric extends FNumeric with SetOperation[Double]{
@@ -67,9 +67,10 @@ abstract class IntFNumeric extends FNumeric  with SetOperation[Int]{
 case class IntExactFNumeric(value:Int) extends IntFNumeric
 case class IntFieldFNumeric(field:FieldInfo) extends IntFNumeric
 
-abstract class FString extends MegaExpression with SetOperation[String]{
+abstract class FString extends FExpression with SetOperation[String]{
   def in(set: Iterable[String]) = StringSetOperation(this,  set)
   def like(other:FString):FBoolean = StringBinaryOperation(this, other, Like)
+  def eqs(other:FString):FBoolean = StringBinaryOperation(this, other, Equals)
 }
 case class ExactFString(value:String) extends FString
 case class FieldFString(field:FieldInfo) extends FString
@@ -78,21 +79,28 @@ trait Selector{
   type K
 }
 
-class MyInterceptor extends MethodInterceptor{
+class MyInterceptor(klass:Class[_]) extends MethodInterceptor{
   def intercept(obj: AnyRef, method: Method, args: Array[AnyRef], proxy: MethodProxy):AnyRef ={
-    throw new FieldNotificationException(FieldInfo(method.getName, method.getReturnType))
+    try{
+      klass.getDeclaredField(method.getName)
+      throw new FieldNotificationException(FieldInfo(method.getName, method.getReturnType))
+    }catch{
+      case e:NoSuchFieldException=>proxy.invokeSuper(obj, args)
+    }
   }
 }
 
 trait IterableSelector[B] extends Selector with Iterable[B]{
   type K=B
+
+  var result:FBoolean = _
+
   def where(expression: K=>FBoolean)(implicit m: Manifest[K]):this.type = {
     val enhancer = new Enhancer();
     enhancer.setSuperclass(m.erasure);
-    enhancer.setCallback(new MyInterceptor)
+    enhancer.setCallback(new MyInterceptor(m.erasure))
     val proxy = enhancer.create();
-    val result = expression(proxy.asInstanceOf[K])
-    println(result)
+    result = expression(proxy.asInstanceOf[K])
     this
   }
 

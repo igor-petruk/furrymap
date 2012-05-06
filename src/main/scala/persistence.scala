@@ -10,7 +10,7 @@ import com.mongodb.{DB, Mongo}
  * Time: 22:33
  */
 
-private trait QueryImplicits{
+trait QueryImplicits{
   implicit def conversionInt(i: =>Int):IntFNumeric=
     try{
       IntExactFNumeric(i)

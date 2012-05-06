@@ -6,6 +6,7 @@ import collection.mutable.{SynchronizedMap, HashMap}
 import com.mongodb.DBObject
 import org.bson.BSONObject
 import org.bson.types.ObjectId
+import java.util.Map
 
 /**
  * User: boui
@@ -31,14 +32,20 @@ object EntitiesMetaInfo {
      * Calculate fields that are mapped with special mappings
      * @return
      */
-    def extraFields: immutable.Map[String, Field] =
+    def extraFields: immutable.Map[String, Field] = {
       specialMapping.
         filter {
-        item => klass.getDeclaredField(item._2) != null
+        item => try{
+          klass.getDeclaredField(item._2)
+          true
+        }catch{
+          case e:NoSuchFieldException=>false
+        }
       }.
         map {
         item => (item._1, klass.getDeclaredField(item._2))
       }
+    }
 
 
     /**
@@ -88,7 +95,7 @@ object EntitiesMetaInfo {
    * @tparam T
    * @return metainfo
    */
-  def getMetaInfo[T](klass: Class[T]) = metainfo.getOrElseUpdate(klass, new MetaInfo(klass))
+  def getMetaInfo[T](klass: Class[T]) =  metainfo.getOrElseUpdate(klass, new MetaInfo(klass))
 }
 
 class DBObjectInfo {
