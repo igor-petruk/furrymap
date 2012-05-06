@@ -1,45 +1,16 @@
-package com.petruk2
+package com.github.igor_petruk.furrymap.query
 
 import java.lang.reflect.Method
-import net.sf.cglib.proxy.{MethodProxy, MethodInterceptor, Enhancer}
-
+import net.sf.cglib.proxy.{Enhancer, MethodProxy, MethodInterceptor}
 
 /**
- * User: Igor Petruk
- * Date: 5/5/12
- * Time: 2:38 PM
+ * User: boui
+ * Date: 5/6/12
+ * Time: 4:09 PM
  */
-
-trait Selector{
-  type K
-}
 
 case class FieldInfo(fieldName:String, fieldType:Class[_])
 case class FieldNotificationException(info:FieldInfo) extends RuntimeException
-
-class MyInterceptor extends MethodInterceptor{
-  def intercept(obj: AnyRef, method: Method, args: Array[AnyRef], proxy: MethodProxy):AnyRef ={
-    throw new FieldNotificationException(FieldInfo(method.getName, method.getReturnType))
-  }
-}
-
-trait IterableSelector[B] extends Selector with Iterable[B]{
-  type K=B
-  def where(expression: K=>FBoolean)(implicit m: Manifest[K]):this.type = {
-    val enhancer = new Enhancer();
-    enhancer.setSuperclass(m.erasure);
-    enhancer.setCallback(new MyInterceptor)
-    val proxy = enhancer.create();
-    val result = expression(proxy.asInstanceOf[K])
-    println(result)
-    this
-  }
-
-  def iterator:Iterator[K] = {
-    println("Making iterator")
-    List[K]().iterator
-  }
-}
 
 abstract class OperationType
 
@@ -103,54 +74,30 @@ abstract class FString extends MegaExpression with SetOperation[String]{
 case class ExactFString(value:String) extends FString
 case class FieldFString(field:FieldInfo) extends FString
 
-object ops{
-
-  implicit def conversionInt(i: =>Int):IntFNumeric=
-    try{
-      IntExactFNumeric(i)
-    }catch{
-      case e:FieldNotificationException=>return IntFieldFNumeric(e.info)
-    }
-
-  implicit def conversionDouble(i: =>Double):DoubleFNumeric=
-    try{
-      DoubleExactFNumeric(i)
-    }catch{
-      case e:FieldNotificationException=>return DoubleFieldFNumeric(e.info)
-    }
-
-  implicit def conversion(i: =>String):FString=
-    try{
-      ExactFString(i)
-    }catch{
-      case e:FieldNotificationException=>return FieldFString(e.info)
-    }
-
+trait Selector{
+  type K
 }
 
-trait EntityT{}
-
-class Data(o: Object){
-  def select[T <: EntityT](implicit m: Manifest[T])={
-    new IterableSelector[T](){
-
-    }
+class MyInterceptor extends MethodInterceptor{
+  def intercept(obj: AnyRef, method: Method, args: Array[AnyRef], proxy: MethodProxy):AnyRef ={
+    throw new FieldNotificationException(FieldInfo(method.getName, method.getReturnType))
   }
 }
 
-class Awesome extends EntityT{
-  val field1 = 0;
-  val field2 = 0.1;
-}
+trait IterableSelector[B] extends Selector with Iterable[B]{
+  type K=B
+  def where(expression: K=>FBoolean)(implicit m: Manifest[K]):this.type = {
+    val enhancer = new Enhancer();
+    enhancer.setSuperclass(m.erasure);
+    enhancer.setCallback(new MyInterceptor)
+    val proxy = enhancer.create();
+    val result = expression(proxy.asInstanceOf[K])
+    println(result)
+    this
+  }
 
-object ClosureBoom {
-    val data = new Data(null)
-    import data._
-    import ops._
-
-     def main(s:Array[String]){
-        
-        select[Awesome] where (x=>(x.field1 gt x.field2) && (x.field1 lt 19) || (x.field1 in Set(1,2,3)))
-        //select[Awesome].where(x=>(x.field1>x.field2)&&(x.field2>2))
-     }
+  def iterator:Iterator[K] = {
+    println("Making iterator")
+    List[K]().iterator
+  }
 }
