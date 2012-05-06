@@ -60,45 +60,44 @@ trait SetOperation[T] {
   def in(set:Iterable[T]):FBoolean
 }
 
-case class FieldFBoolean(field:FieldInfo) extends FBoolean{
+case class FieldFBoolean(field:FieldInfo) extends FBoolean with Evaluatable{
   def eval = new BasicDBObject(field.fieldName, true)
 }
-case class BooleanBinaryOperation(left:FBoolean,  right:FBoolean, op:OperationType) extends FBoolean{
+case class BooleanBinaryOperation(left:FBoolean,  right:FBoolean, op:OperationType) extends FBoolean with Evaluatable{
   def eval = op match {
     case And|Or=> new BasicDBObject(op.abbreviation, toJava(List(left.eval, right.eval)))
   }
 }
-case class NumericBinaryOperation(left:FieldFNumeric,  right:ExactFNumeric, op:OperationType) extends FBoolean{
+case class NumericBinaryOperation(left:FieldFNumeric,  right:ExactFNumeric, op:OperationType) extends FBoolean with Evaluatable{
   def eval = op match {
     case Greater|Less => new BasicDBObject(left.getName, new BasicDBObject(op.abbreviation, right.getValue))
   }
 }
-case class IntSetOperation(left:IntFieldFNumeric,  right:Iterable[Int]) extends FBoolean{
+case class IntSetOperation(left:IntFieldFNumeric,  right:Iterable[Int]) extends FBoolean with Evaluatable{
   def eval = new BasicDBObject(left.getName, new BasicDBObject("$in", toJava(right)))
 }
-case class DoubleSetOperation(left:DoubleFieldFNumeric,  right:Iterable[Double]) extends FBoolean{
+case class DoubleSetOperation(left:DoubleFieldFNumeric,  right:Iterable[Double]) extends FBoolean with Evaluatable{
   def eval = new BasicDBObject(left.getName, new BasicDBObject("$in", toJava(right)))
 }
-case class StringBinaryOperation(left:FieldFString,  right:ExactFString, op:OperationType) extends FBoolean{
+case class StringBinaryOperation(left:FieldFString,  right:ExactFString, op:OperationType) extends FBoolean with Evaluatable{
   def eval = op match {
     case Equals=> new BasicDBObject(left.field.fieldName, right.value)
     case Like=> new BasicDBObject(left.field.fieldName, new BasicDBObject(op.abbreviation, right.value))
   }
 }
-case class StringSetOperation(left:FieldFString,  right:Iterable[String]) extends FBoolean {
+case class StringSetOperation(left:FieldFString,  right:Iterable[String]) extends FBoolean with Evaluatable {
   def eval = new BasicDBObject(left.field.fieldName, new BasicDBObject("$in", toJava(right)))
 }
 
 
 abstract class FExpression{
+}
+
+trait Evaluatable{self:FBoolean=>
   def eval:DBObject
 }
 
-trait EvalStub{
-  def eval:DBObject = null
-}
-
-abstract class FBoolean extends FExpression{
+abstract class FBoolean extends FExpression with Evaluatable{
   def &&(other:FBoolean):FBoolean = BooleanBinaryOperation(this, other, And)
   def ||(other:FBoolean):FBoolean = BooleanBinaryOperation(this, other, Or)
   def eqs(other:FBoolean):FBoolean = BooleanBinaryOperation(this, other, Equals)
@@ -107,11 +106,11 @@ abstract class FBoolean extends FExpression{
 abstract class FNumeric extends FExpression{
 }
 
-trait ExactFNumeric extends EvalStub{
+trait ExactFNumeric {
   def getValue:AnyRef
 }
 
-trait FieldFNumeric extends EvalStub{
+trait FieldFNumeric {
   def getName:String
   def gt(other:ExactFNumeric):FBoolean = NumericBinaryOperation(this, other, Greater)
   def lt(other:ExactFNumeric):FBoolean = NumericBinaryOperation(this, other, Less)
@@ -139,8 +138,8 @@ case class IntFieldFNumeric(field:FieldInfo) extends IntFNumeric with FieldFNume
 
 abstract class FString extends FExpression
 
-case class ExactFString(value:String) extends FString with EvalStub
-case class FieldFString(field:FieldInfo) extends FString with SetOperation[String] with EvalStub{
+case class ExactFString(value:String) extends FString
+case class FieldFString(field:FieldInfo) extends FString with SetOperation[String] {
   def in(set: Iterable[String]) = StringSetOperation(this,  set)
   def like(other:ExactFString):FBoolean = StringBinaryOperation(this, other, Like)
   def eqs(other:ExactFString):FBoolean = StringBinaryOperation(this, other, Equals)
@@ -180,7 +179,7 @@ trait IterableSelector[B] extends Selector with Iterable[B]{
     List[K]().iterator
   }
 }
-    /*
+
 class OpenedIterableSelector[T] extends IterableSelector[T]{
   def getExpression = result
 }
@@ -193,14 +192,17 @@ class QueryValidator{
   def getSelectorFor[T <: Entity](implicit m: Manifest[T]) = new OpenedIterableSelector[T]
 }
 
-      */
 object Test{
   def fixture = new {
-  //  val validator = new QueryValidator()
-  //  val selector = validator.getSelectorFor[Awesome]
+    val validator = new QueryValidator()
+    val selector = validator.getSelectorFor[Awesome]
   }
 
   def main(argv:Array[String]){
+
+    def testCase1(){
+
+    }
     val mongo = new Mongo
     val db = mongo.getDB("test")
     val collection = db.getCollection("collection")
