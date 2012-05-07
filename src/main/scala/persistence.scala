@@ -66,12 +66,33 @@ trait QueryImplicits{
 object persistence
   extends QueryImplicits{
 
-  trait Entity extends WithObjectId with DBObjectImpl
+  trait Entity extends WithObjectId with DBObjectImpl {
+    def collectionName = this.getClass.getName
+  }
 
   class MongoDB private[persistence] (db:DB){
+    import scala.collection.JavaConversions._
+
     def isConnected = db.getMongo.getConnector.isOpen
 
-    def select[T <: Entity](implicit m: Manifest[T]) = new IterableSelector[T](){}
+    def select[T <: Entity](implicit m: Manifest[T]) = new IterableSelector[T](this)
+
+    def insert[T <: Entity](entities: T*)(implicit m: Manifest[T]){
+      for ((groupName, items)<-entities.groupBy(_.collectionName)){
+        val collection = db.getCollection(groupName)
+        collection.insert(items)
+      }
+    }
+
+    def dropCollection[T<:Entity](implicit m:Manifest[T]){
+      dropCollection(m.erasure.getName)
+    }
+
+    def dropCollection(name:String){
+      db.getCollection(name).drop()
+    }
+
+    def getDatabaseObject = db
   }
 
   class Furrymap  private(mongo:Mongo) {
