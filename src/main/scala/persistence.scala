@@ -2,7 +2,8 @@ package com.github.igor_petruk.furrymap
 
 import dbobject._
 import query._
-import com.mongodb.{DB, Mongo}
+import collection.mutable.{SynchronizedMap, HashMap}
+import com.mongodb.{DBCollection, DB, Mongo}
 
 /**
  * User: Igor Petruk
@@ -93,6 +94,13 @@ object persistence
     }
 
     def getDatabaseObject = db
+
+    private val collections = new HashMap[Class[_], DBCollection] with SynchronizedMap[Class[_], DBCollection]
+    def getCollection(klass:Class[_])=collections.getOrElseUpdate(klass, {
+      val collection = db.getCollection(klass.getName)
+      EntitiesMetaInfo.prepareClassesConfig(klass, collection)
+      collection
+    })
   }
 
   class Furrymap  private(mongo:Mongo) {

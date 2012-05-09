@@ -63,6 +63,9 @@ trait SetOperation[T] {
 case class FieldFBoolean(field:FieldInfo) extends FBoolean{
   def eval = new BasicDBObject(field.fieldName, true)
 }
+case class TrueFBoolean() extends FBoolean{
+  def eval = new BasicDBObject()
+}
 case class BooleanBinaryOperation(left:FBoolean,  right:FBoolean, op:OperationType) extends FBoolean{
   def eval = op match {
     case And|Or=> new BasicDBObject(op.abbreviation, toJava(List(left.eval, right.eval)))
@@ -175,11 +178,15 @@ class IterableSelector[B<:Entity](database:MongoDB)(implicit m:Manifest[B]) exte
     this
   }
 
+  def all():this.type = {
+    expression = TrueFBoolean()
+    this
+  }
+
   def getExpression = expression
 
   private def runQuery={
-    val collection = database.getDatabaseObject.getCollection(m.erasure.getName)
-    collection.setObjectClass(m.erasure)
+    val collection = database.getCollection(m.erasure)
     val cursor = collection.find(expression.eval)
 
     var list:List[K] = Nil

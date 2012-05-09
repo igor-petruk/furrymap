@@ -13,6 +13,10 @@ case class Person(name:String, age:Int, height:Double, alive:Boolean) extends En
   def this() = this("",0,0, false)
 }
 
+case class Game(name:String,player1:Person, player2:Person) extends Entity{
+  def this() = this("hello",null, null)
+}
+
 @RunWith(classOf[JUnitRunner])
 class MongoQueryIntegrationTestSpec extends Spec with GivenWhenThen {
   val db = Furrymap.localMongo.getDatabase("test")
@@ -23,10 +27,14 @@ class MongoQueryIntegrationTestSpec extends Spec with GivenWhenThen {
     Person("Rocksy", 21, 180, true)
   )
 
+  val game = Game("Chess",items(0),items(1))
+
   def givenAFixture{
     given(items.toString())
     dropCollection[Person]
     insert(items:_*)
+    dropCollection[Game]
+    insert(game)
   }
 
   describe("FurryMap API"){
@@ -37,6 +45,14 @@ class MongoQueryIntegrationTestSpec extends Spec with GivenWhenThen {
       then("it should return " + items(1))
         assert(result.head === items(1))
         assert(result.size === 1)
+    }
+    it ("should support storing embedded objects"){
+      givenAFixture
+      when("select of all Game's is performed")
+      val result = select[Game].all()
+      then("it should return " + game)
+      assert(result.head === game)
+      assert(result.size === 1)
     }
   }
 }
