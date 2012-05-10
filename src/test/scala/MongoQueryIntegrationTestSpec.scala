@@ -27,14 +27,17 @@ class MongoQueryIntegrationTestSpec extends Spec with GivenWhenThen {
     Person("Rocksy", 21, 180, true)
   )
 
-  val game = Game("Chess",items(0),items(1))
+  val games = List(
+    Game("Chess",items(0),items(1)),
+    Game("Cards",items(1),items(0))
+  )
 
   def givenAFixture{
     given(items.toString())
     dropCollection[Person]
     insert(items:_*)
     dropCollection[Game]
-    insert(game)
+    insert(games:_*)
   }
 
   describe("FurryMap API"){
@@ -50,9 +53,10 @@ class MongoQueryIntegrationTestSpec extends Spec with GivenWhenThen {
       givenAFixture
       when("select of all Game's is performed")
       val result = select[Game].all()
-      then("it should return " + game)
-      assert(result.head === game)
-      assert(result.size === 1)
+      then("it should return " + games)
+      assert(result.exists (_==games(0)))
+      assert(result.exists (_==games(1)))
+      assert(result.size === 2)
     }
   }
 }

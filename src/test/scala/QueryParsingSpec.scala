@@ -8,7 +8,7 @@ import com.github.igor_petruk.furrymap.query._
 import org.scalatest.{GivenWhenThen, Spec}
 import scala.PartialFunction
 
-case class Awesome(name:String, age:Int, size:Double) extends Entity{
+case class Awesome(name:String, age:Int, height:Double) extends Entity{
   def this() = this("",0,0)
 }
 
@@ -57,32 +57,32 @@ class QueryParsingSpec extends Spec with GivenWhenThen {
       }
     }
 
-    it ("should parse expression 12.5 lt size"){
-      given("12.5 lt size")
+    it ("should parse expression 150 lt height"){
+      given("150 lt height")
       val f = fixture
       import f._
-      selector.where(x=>  x.size lt 12.5)
+      selector.where(x=>  x.height lt 160.0)
       then("it should match ")
       validator.validate(selector){
-        case NumericBinaryOperation(DoubleFieldFNumeric(FieldInfo("size",_)),DoubleExactFNumeric(12.5),Less)=>
+        case NumericBinaryOperation(DoubleFieldFNumeric(FieldInfo("height",_)),DoubleExactFNumeric(160.0),Less)=>
       }
     }
 
-    it ("should parse age in (16, 18) and name eqs \'John\' or size gt 15.0"){
-      given("age in (16, 18) and name eqs \'John\' or size gt 15.0 query")
+    it ("should parse age in (16, 18) and name eqs \'John\' or height gt 150"){
+      given("age in (16, 18) and name eqs \'John\' or height gt 150 query")
       val f = fixture
       import f._
-      selector.where(x=>(x.age in Set(16, 18)) && (x.name eqs "John") || (x.size gt 15.0))
+      selector.where(x=>(x.age in Set(16, 18)) && (x.name eqs "John") || (x.height gt 150.0))
       then("it should match ")
       validator.validate(selector){
         case
           BooleanBinaryOperation(
             BooleanBinaryOperation(
-              IntSetOperation(IntFieldFNumeric(FieldInfo(age,int)),SetMatcher(16,18)),
+              IntSetOperation(IntFieldFNumeric(FieldInfo("age",_)),SetMatcher(16,18)),
             StringBinaryOperation(
               FieldFString(FieldInfo("name",_)),ExactFString("John"),Equals),
             And),
-              NumericBinaryOperation(DoubleFieldFNumeric(FieldInfo("size",_)),DoubleExactFNumeric(15.0),Greater),
+              NumericBinaryOperation(DoubleFieldFNumeric(FieldInfo("height",_)),DoubleExactFNumeric(150.0),Greater),
             Or) =>
       }
     }
