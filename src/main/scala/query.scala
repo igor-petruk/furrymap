@@ -5,6 +5,7 @@ import net.sf.cglib.proxy.{Enhancer, MethodProxy, MethodInterceptor}
 import com.github.igor_petruk.furrymap.persistence.Entity
 import com.mongodb.{BasicDBObject, Mongo, DBObject}
 import java.util.ArrayList
+import com.github.igor_petruk.furrymap.persistence._
 
 /**
  * User: boui
@@ -63,7 +64,10 @@ trait SetOperation[T] {
 case class FieldFBoolean(field:FieldInfo) extends FBoolean with Evaluatable{
   def eval = new BasicDBObject(field.fieldName, true)
 }
-case class BooleanBinaryOperation(left:FBoolean,  right:FBoolean, op:OperationType) extends FBoolean with Evaluatable{
+case class TrueFBoolean() extends FBoolean{
+  def eval = new BasicDBObject()
+}
+case class BooleanBinaryOperation(left:FBoolean,  right:FBoolean, op:OperationType) extends FBoolean{
   def eval = op match {
     case And|Or=> new BasicDBObject(op.abbreviation, toJava(List(left.eval, right.eval)))
   }
@@ -160,74 +164,40 @@ class MyInterceptor(klass:Class[_]) extends MethodInterceptor{
   }
 }
 
-trait IterableSelector[B] extends Selector with Iterable[B]{
+class IterableSelector[B<:Entity](database:MongoDB)(implicit m:Manifest[B]) extends Selector with Iterable[B]{
   type K=B
 
-  var result:FBoolean = _
+  var expression:FBoolean = _
 
-  def where(expression: K=>FBoolean)(implicit m: Manifest[K]):this.type = {
+  def where(queryExpression: K=>FBoolean)(implicit m: Manifest[K]):this.type = {
     val enhancer = new Enhancer();
     enhancer.setSuperclass(m.erasure);
     enhancer.setCallback(new MyInterceptor(m.erasure))
     val proxy = enhancer.create();
-    result = expression(proxy.asInstanceOf[K])
+    expression = queryExpression(proxy.asInstanceOf[K])
     this
   }
 
-  def iterator:Iterator[K] = {
-    println("Making iterator")
-    List[K]().iterator
-  }
-}
-
-class OpenedIterableSelector[T] extends IterableSelector[T]{
-  def getExpression = result
-}
-
-case class Awesome(name:String, age:Int, size:Double, alive:Boolean) extends Entity{
-  def this() = this("",0,0, false)
-}
-
-class QueryValidator{
-  def getSelectorFor[T <: Entity](implicit m: Manifest[T]) = new OpenedIterableSelector[T]
-}
-
-object Test{
-  def fixture = new {
-    val validator = new QueryValidator()
-    val selector = validator.getSelectorFor[Awesome]
+  def all():this.type = {
+    expression = TrueFBoolean()
+    this
   }
 
-  def main(argv:Array[String]){
+  def getExpression = expression
 
-    def testCase1(){
+  private def runQuery={
+    val collection = database.getCollection(m.erasure)
+    val cursor = collection.find(expression.eval)
 
+    var list:List[K] = Nil
+    while(cursor.hasNext){
+      list = cursor.next().asInstanceOf[K]::list
     }
-    val mongo = new Mongo
-    val db = mongo.getDB("test")
-    val collection = db.getCollection("collection")
-    collection.drop()
-    
-    val obj = new BasicDBObject()
-    obj.put("a",false)
-    obj.put("b",false)
-    collection.insert(obj)
-    val obj1 = new BasicDBObject()
-    obj1.put("a",true)
-    obj1.put("b",true)
-    collection.insert(obj1)
-    val obj2 = new BasicDBObject()
-    obj2.put("a",false)
-    collection.insert(obj2)
-
-    val query = new BasicDBObject("b",false)
-    val cursor = collection.find(query)
-    while (cursor.hasNext){
-      val item = cursor.next()
-      println(item)
-    }
-    cursor.close()
-    
-    mongo.close
+    cursor.close
+    list
   }
+
+  private lazy val queryResults = runQuery
+
+  def iterator:Iterator[K] = queryResults.iterator
 }

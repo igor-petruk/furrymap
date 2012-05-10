@@ -5,12 +5,8 @@ import org.scalatest.junit.JUnitRunner
 
 import com.github.igor_petruk.furrymap.persistence._
 import com.github.igor_petruk.furrymap.query._
-import org.scalatest.{GivenWhenThen, Spec, FlatSpec}
+import org.scalatest.{GivenWhenThen, Spec}
 import scala.PartialFunction
-
-class OpenedIterableSelector[T] extends IterableSelector[T]{
-  def getExpression = result
-}
 
 case class Awesome(name:String, age:Int, size:Double) extends Entity{
   def this() = this("",0,0)
@@ -24,9 +20,9 @@ object SetMatcher{
 class QueryParsingSpec extends Spec with GivenWhenThen {
 
   class QueryValidator{
-    def getSelectorFor[T <: Entity](implicit m: Manifest[T]) = new OpenedIterableSelector[T]
+    def getSelectorFor[T <: Entity](implicit m: Manifest[T]) = new IterableSelector[T](null)
 
-    def validate[T<:Entity](selector:OpenedIterableSelector[T])(matcher:PartialFunction[FBoolean,Unit]){
+    def validate[T<:Entity](selector:IterableSelector[T])(matcher:PartialFunction[FBoolean,Unit]){
       if (!matcher.isDefinedAt(selector.getExpression)){
         fail(selector.getExpression+" does not match")
       }

@@ -2,7 +2,8 @@ package com.github.igor_petruk.furrymap
 
 import dbobject._
 import query._
-import com.mongodb.{DB, Mongo}
+import collection.mutable.{SynchronizedMap, HashMap}
+import com.mongodb.{DBCollection, DB, Mongo}
 
 /**
  * User: Igor Petruk
@@ -66,12 +67,40 @@ trait QueryImplicits{
 object persistence
   extends QueryImplicits{
 
-  trait Entity extends WithObjectId with DBObjectImpl
+  trait Entity extends WithObjectId with DBObjectImpl {
+    def collectionName = this.getClass.getName
+  }
 
   class MongoDB private[persistence] (db:DB){
+    import scala.collection.JavaConversions._
+
     def isConnected = db.getMongo.getConnector.isOpen
 
-    def select[T <: Entity](implicit m: Manifest[T]) = new IterableSelector[T](){}
+    def select[T <: Entity](implicit m: Manifest[T]) = new IterableSelector[T](this)
+
+    def insert[T <: Entity](entities: T*)(implicit m: Manifest[T]){
+      for ((groupName, items)<-entities.groupBy(_.collectionName)){
+        val collection = db.getCollection(groupName)
+        collection.insert(items)
+      }
+    }
+
+    def dropCollection[T<:Entity](implicit m:Manifest[T]){
+      dropCollection(m.erasure.getName)
+    }
+
+    def dropCollection(name:String){
+      db.getCollection(name).drop()
+    }
+
+    def getDatabaseObject = db
+
+    private val collections = new HashMap[Class[_], DBCollection] with SynchronizedMap[Class[_], DBCollection]
+    def getCollection(klass:Class[_])=collections.getOrElseUpdate(klass, {
+      val collection = db.getCollection(klass.getName)
+      EntitiesMetaInfo.prepareClassesConfig(klass, collection)
+      collection
+    })
   }
 
   class Furrymap  private(mongo:Mongo) {

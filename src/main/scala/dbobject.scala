@@ -3,10 +3,11 @@ package com.github.igor_petruk.furrymap.dbobject
 import collection.immutable
 import java.lang.reflect.Field
 import collection.mutable.{SynchronizedMap, HashMap}
-import com.mongodb.DBObject
 import org.bson.BSONObject
 import org.bson.types.ObjectId
 import java.util.Map
+import com.mongodb.{DBCollection, DBObject}
+import com.github.igor_petruk.furrymap.persistence.Entity
 
 /**
  * User: boui
@@ -79,6 +80,7 @@ object EntitiesMetaInfo {
     private def shouldBeAdded(field: Field) = {
       (specialMapping.values.exists(field.getName == _)) ||
         (field.getName.contains("metaInfo")) ||
+        (field.getName.contains("$")) ||
         (field.getName.contains("furrymapObjectInfo"))
     }
   }
@@ -96,6 +98,19 @@ object EntitiesMetaInfo {
    * @return metainfo
    */
   def getMetaInfo[T](klass: Class[T]) =  metainfo.getOrElseUpdate(klass, new MetaInfo(klass))
+
+  def prepareClassesConfig(klass:Class[_], db:DBCollection){
+    db.setObjectClass(klass)
+    def recurConfiguration(prefix:String, internalClass:Class[_]){
+      for (field <- internalClass.getDeclaredFields){
+        if (classOf[Entity].isAssignableFrom(field.getType)){
+          db.setInternalClass(prefix+field.getName, field.getType)
+          recurConfiguration(field.getName+".", field.getType)
+        }
+      }
+    }
+    recurConfiguration("",klass)
+  }
 }
 
 class DBObjectInfo {
