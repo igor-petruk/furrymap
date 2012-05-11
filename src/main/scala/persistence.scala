@@ -3,7 +3,7 @@ package com.github.igor_petruk.furrymap
 import dbobject._
 import query._
 import collection.mutable.{SynchronizedMap, HashMap}
-import com.mongodb.{DBCollection, DB, Mongo}
+import com.mongodb.{BasicDBObject, DBCollection, DB, Mongo}
 
 /**
  * User: Igor Petruk
@@ -83,6 +83,22 @@ object persistence
         val collection = db.getCollection(groupName)
         collection.insert(items)
       }
+    }
+    
+    def index[T<:Entity](fields: (T=>Any)*)(implicit m:Manifest[T]):this.type={
+      val indexObject = new BasicDBObject()
+      for (field<-fields){
+        try{
+          val entity:T = InterceptorBuilder.buildInterceptor("",m.erasure).asInstanceOf[T]
+          val value = field(entity)
+        }catch{
+          case e:FieldNotificationException=>{
+            indexObject.put(e.info.fieldName, 1)
+          }
+        }
+      }
+      getCollection(m.erasure).ensureIndex(indexObject)
+      this
     }
 
     def dropCollection[T<:Entity](implicit m:Manifest[T]){

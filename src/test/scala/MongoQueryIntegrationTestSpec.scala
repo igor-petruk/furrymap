@@ -19,7 +19,12 @@ case class Game(name:String,player1:Person, player2:Person) extends Entity{
 
 @RunWith(classOf[JUnitRunner])
 class MongoQueryIntegrationTestSpec extends Spec with GivenWhenThen {
-  val db = Furrymap.localMongo.getDatabase("test")
+  val db = Furrymap.localMongo.
+    getDatabase("test").
+    index[Game](_.player1.name).
+    index[Person](_.age).
+    index[Person](_.age, _.height)
+
   import db._
 
   val items = List(
@@ -34,9 +39,9 @@ class MongoQueryIntegrationTestSpec extends Spec with GivenWhenThen {
 
   def givenAFixture{
     given(items+" and "+games)
-    dropCollection[Person]
+    select[Person].delete
     insert(items:_*)
-    dropCollection[Game]
+    select[Game].delete
     insert(games:_*)
   }
 
