@@ -33,7 +33,7 @@ class MongoQueryIntegrationTestSpec extends Spec with GivenWhenThen {
   )
 
   def givenAFixture{
-    given(items.toString())
+    given(items+" and "+games)
     dropCollection[Person]
     insert(items:_*)
     dropCollection[Game]
@@ -57,6 +57,14 @@ class MongoQueryIntegrationTestSpec extends Spec with GivenWhenThen {
       assert(result.exists (_==games(0)))
       assert(result.exists (_==games(1)))
       assert(result.size === 2)
+    }
+    it ("should support querying embedded objects"){
+      givenAFixture
+      when("select of all Game's where first player age is 21")
+      val result = select[Game].where(game=>game.player1.age eqs 21)
+      then("it should return " + games(1))
+      assert(result.head ==games(1))
+      assert(result.size === 1)
     }
   }
 }

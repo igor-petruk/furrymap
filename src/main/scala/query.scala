@@ -74,6 +74,7 @@ case class BooleanBinaryOperation(left:FBoolean,  right:FBoolean, op:OperationTy
 }
 case class NumericBinaryOperation(left:FieldFNumeric,  right:ExactFNumeric, op:OperationType) extends FBoolean with Evaluatable{
   def eval = op match {
+    case Equals=> new BasicDBObject(left.getName, right.getValue)
     case Greater|Less => new BasicDBObject(left.getName, new BasicDBObject(op.abbreviation, right.getValue))
   }
 }
@@ -153,11 +154,23 @@ trait Selector{
   type K
 }
 
-class MyInterceptor(klass:Class[_]) extends MethodInterceptor{
+object InterceptorBuilder{
+  def buildInterceptor(prefix:String, klass:Class[_])={
+    val enhancer = new Enhancer();
+    enhancer.setSuperclass(klass);
+    enhancer.setCallback(new MyInterceptor(prefix,klass))
+    enhancer.create();
+  }
+}
+
+class MyInterceptor(prefix:String, klass:Class[_]) extends MethodInterceptor{
   def intercept(obj: AnyRef, method: Method, args: Array[AnyRef], proxy: MethodProxy):AnyRef ={
     try{
       klass.getDeclaredField(method.getName)
-      throw new FieldNotificationException(FieldInfo(method.getName, method.getReturnType))
+      if (classOf[Entity].isAssignableFrom(method.getReturnType)){
+        return InterceptorBuilder.buildInterceptor(prefix+method.getName+".", method.getReturnType)
+      }else
+        throw new FieldNotificationException(FieldInfo(prefix+method.getName, method.getReturnType))
     }catch{
       case e:NoSuchFieldException=>proxy.invokeSuper(obj, args)
     }
@@ -170,10 +183,7 @@ class IterableSelector[B<:Entity](database:MongoDB)(implicit m:Manifest[B]) exte
   var expression:FBoolean = _
 
   def where(queryExpression: K=>FBoolean)(implicit m: Manifest[K]):this.type = {
-    val enhancer = new Enhancer();
-    enhancer.setSuperclass(m.erasure);
-    enhancer.setCallback(new MyInterceptor(m.erasure))
-    val proxy = enhancer.create();
+    val proxy = InterceptorBuilder.buildInterceptor("",m.erasure)
     expression = queryExpression(proxy.asInstanceOf[K])
     this
   }
