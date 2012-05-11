@@ -52,7 +52,7 @@ class MongoQueryIntegrationTestSpec extends Spec with GivenWhenThen {
     it ("should support storing embedded objects"){
       givenAFixture
       when("select of all Game's is performed")
-      val result = select[Game].all()
+      val result = select[Game]
       then("it should return " + games)
       assert(result.exists (_==games(0)))
       assert(result.exists (_==games(1)))
@@ -64,6 +64,15 @@ class MongoQueryIntegrationTestSpec extends Spec with GivenWhenThen {
       val result = select[Game].where(game=>game.player1.age eqs 21)
       then("it should return " + games(1))
       assert(result.head ==games(1))
+      assert(result.size === 1)
+    }
+    it ("should support deletion of objects"){
+      givenAFixture
+      when("deleted of all Game's where second player name is Igor and queried all games")
+      select[Game].where(_.player2.name eqs "Igor").delete
+      val result = select[Game]
+      then("it should return " + games(0))
+      assert(result.head ==games(0))
       assert(result.size === 1)
     }
   }

@@ -180,7 +180,7 @@ class MyInterceptor(prefix:String, klass:Class[_]) extends MethodInterceptor{
 class IterableSelector[B<:Entity](database:MongoDB)(implicit m:Manifest[B]) extends Selector with Iterable[B]{
   type K=B
 
-  var expression:FBoolean = _
+  var expression:FBoolean = TrueFBoolean()
 
   def where(queryExpression: K=>FBoolean)(implicit m: Manifest[K]):this.type = {
     val proxy = InterceptorBuilder.buildInterceptor("",m.erasure)
@@ -188,9 +188,9 @@ class IterableSelector[B<:Entity](database:MongoDB)(implicit m:Manifest[B]) exte
     this
   }
 
-  def all():this.type = {
-    expression = TrueFBoolean()
-    this
+  def delete(){
+    val collection = database.getCollection(m.erasure)
+    collection.remove(expression.eval)
   }
 
   def getExpression = expression
